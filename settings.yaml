@@ -1,0 +1,15 @@
+interval: "18000"  # 5h
+initialDelay: "300"  # 5m
+ignoredResouces:
+  - apiGroup: ""
+    kind: ConfigMap
+    nameRegExp: kube-root-ca.crt
+  - apiGroup: ""
+    kind: ConfigMap
+    nameRegExp: werf-synchronization
+  - apiGroup: ""
+    kind: Secret
+    nameRegExp: default-token-\w+$
+  - apiGroup: ""
+    kind: ServiceAccount
+    nameRegExp: default
