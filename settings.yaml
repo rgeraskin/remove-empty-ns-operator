@@ -1,5 +1,5 @@
-interval: "18000"  # 5h
-initialDelay: "300"  # 5m
+interval: "18000" # 5h
+initialDelay: "300" # 5m
 ignoredResouces:
   - apiGroup: ""
     kind: ConfigMap
