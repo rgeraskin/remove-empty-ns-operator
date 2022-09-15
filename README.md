@@ -14,7 +14,7 @@ kubectl apply -k .
 
 ## Configuration
 
-See `settings.yaml`
+See `settings.yaml` as example
 
 ```yaml
 interval: "18000"  # 5h
@@ -32,8 +32,16 @@ ignoredResouces:
   - apiGroup: ""
     kind: ServiceAccount
     nameRegExp: default
+protectedNamespaces:
+  - protected-one
+  - default
+  - kube-public
+  - kube-system
 ```
 
 * `interval` - interval between namespaces check
 * `initialDelay` - 'grace period' before new namespace will be checked
 * `ignoredResouces` - namespace will be treated as empty if it contains only 'ignored resources'
+* `protectedNamespaces` - these namespaces will not be deleated dispite of emptiness
+
+Note that usually there is no need to add kubernetes default namespaces (`default`, `kube-public` and `kube-system`) to `protectedNamespaces` because they have some resources inside in the most cases. But you certainly can do it just to be sure that nothing will happen with them. Also, if your `kube-system` is empty you are probably it trouble already :)

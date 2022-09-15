@@ -13,3 +13,8 @@ ignoredResouces:
   - apiGroup: ""
     kind: ServiceAccount
     nameRegExp: default
+protectedNamespaces:
+  - protected-one
+  - default
+  - kube-public
+  - kube-system

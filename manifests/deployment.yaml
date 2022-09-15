@@ -18,12 +18,12 @@ spec:
     spec:
       serviceAccountName: remove-empty-ns-operator
       containers:
-      - name: remove-empty-ns-operator
-        image: rgeraskin/remove-empty-ns-operator:1.0
-        volumeMounts:
-        - name: config
-          mountPath: /config
+        - name: remove-empty-ns-operator
+          image: rgeraskin/remove-empty-ns-operator:1.1
+          volumeMounts:
+            - name: config
+              mountPath: /config
       volumes:
-      - name: config
-        configMap:
-          name: remove-empty-ns-operator
+        - name: config
+          configMap:
+            name: remove-empty-ns-operator
