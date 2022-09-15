@@ -19,9 +19,13 @@ interval = int(settings["interval"])
 
 initial_delay = int(settings["initialDelay"])
 ignored_resouces = settings["ignoredResouces"]
+protected_namespaces = settings.get("protectedNamespaces", [])
 
 
-@kopf.timer('namespaces', interval=interval, initial_delay=initial_delay)
+@kopf.timer('namespaces',
+            interval=interval,
+            initial_delay=initial_delay,
+            when=lambda name, **_: name not in protected_namespaces)
 def remove_empty_ns(status, name, body, logger, **kwargs):
     global core_api
     meta = body["metadata"]
