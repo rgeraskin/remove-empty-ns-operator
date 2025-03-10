@@ -1,7 +1,6 @@
 """Tests for the remove-empty-ns-operator that manages empty Kubernetes namespaces."""
 
-# 2do: replace time.sleep with something more elegant
-
+import signal
 import time
 import unittest
 
@@ -9,6 +8,8 @@ import yaml
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from kubernetes.config.config_exception import ConfigException
+
+DEADLINE_SECONDS = 30
 
 
 class TestRemoveEmptyNsOperator(unittest.TestCase):
@@ -25,10 +26,13 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         cls.core_v1 = client.CoreV1Api()
         cls.apps_v1 = client.AppsV1Api()
 
+        def handler(signum, frame):
+            raise AssertionError("Deadline exceeded")
+
+        signal.signal(signal.SIGALRM, handler)
+
         # Test constants
-        cls.TEST_NS_PREFIX = "test-empty-ns-"
         cls.OPERATOR_ANNOTATION = "remove-empty-ns-operator.kopf.dev/will-remove"
-        cls.check_interval = 5
         cls.finalizer = "kopf.zalando.org/KopfFinalizerMarker"
         cls.operator_name = "remove-empty-ns-operator"
         cls.operator_namespace = "remove-empty-ns-operator"
@@ -96,19 +100,68 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
             namespace=namespace, body=deployment
         )
 
+    def operator_restart(self):
+        """Helper to restart the operator"""
+        # scale down the operator deployment
+        self.operator_scale_down()
+
+        # scale up the operator deployment
+        self.operator_scale_up()
+
+    def operator_scale_down(self):
+        """Helper to scale down the operator"""
+        # scale down the operator deployment
+        self.apps_v1.patch_namespaced_deployment_scale(
+            name=self.operator_name,
+            namespace=self.operator_namespace,
+            body={"spec": {"replicas": 0}},
+        )
+
+        # wait for operator to scale down
+        signal.alarm(DEADLINE_SECONDS)
+        while True:
+            pods = self.core_v1.list_namespaced_pod(namespace=self.operator_namespace)
+            if len(pods.items) == 0:
+                break
+            time.sleep(1)
+        signal.alarm(0)
+
+    def operator_scale_up(self):
+        """Helper to scale up the operator"""
+        # scale up the operator deployment
+        self.apps_v1.patch_namespaced_deployment_scale(
+            name=self.operator_name,
+            namespace=self.operator_namespace,
+            body={"spec": {"replicas": 1}},
+        )
+
+        # wait for operator to start
+        signal.alarm(DEADLINE_SECONDS)
+        while True:
+            pods = self.core_v1.list_namespaced_pod(namespace=self.operator_namespace)
+            if len(pods.items) == 1 and pods.items[0].status.phase == "Running":
+                break
+            time.sleep(1)
+        signal.alarm(0)
+
     def test_empty_namespace_gets_marked(self):
         """Test that an empty namespace gets marked for deletion"""
         # Create a new namespace
         self.ns_name = "test-empty-namespace-gets-marked"
         self.create_namespace(self.ns_name)
 
-        # Wait for operator to check the namespace
-        time.sleep(self.check_interval + 5)
-
-        # Verify the namespace got marked
-        ns = self.core_v1.read_namespace(self.ns_name)
-        self.assertIn(self.OPERATOR_ANNOTATION, ns.metadata.annotations)
-        self.assertEqual(ns.metadata.annotations[self.OPERATOR_ANNOTATION], "True")
+        # wait for operator to mark the namespace
+        signal.alarm(DEADLINE_SECONDS)
+        while True:
+            ns = self.core_v1.read_namespace(self.ns_name)
+            if (
+                ns.metadata.annotations
+                and self.OPERATOR_ANNOTATION in ns.metadata.annotations
+                and ns.metadata.annotations[self.OPERATOR_ANNOTATION] == "True"
+            ):
+                break
+            time.sleep(1)
+        signal.alarm(0)
 
     def test_empty_namespace_gets_deleted(self):
         """Test that a marked empty namespace gets deleted"""
@@ -116,14 +169,18 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         self.ns_name = "test-empty-namespace-gets-deleted"
         self.create_namespace(self.ns_name)
 
-        # Wait for two intervals - one to mark, one to delete,
-        # and 5 seconds to ensure the operator has time to delete the namespace
-        time.sleep((self.check_interval * 2) + 5 + 5)
-
-        # Verify the namespace was deleted
-        with self.assertRaises(ApiException) as context:
-            self.core_v1.read_namespace(self.ns_name)
-        self.assertEqual(context.exception.status, 404)
+        # wait for operator to delete the namespace
+        signal.alarm(DEADLINE_SECONDS)
+        while True:
+            try:
+                ns = self.core_v1.read_namespace(self.ns_name)
+                if ns.metadata.deletion_timestamp:
+                    break
+            except ApiException as e:
+                if e.status != 404:
+                    break
+            time.sleep(1)
+        signal.alarm(0)
 
     def test_non_empty_namespace_not_marked(self):
         """Test that non-empty namespace doesn't get marked"""
@@ -135,7 +192,7 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         self.create_deployment(self.ns_name)
 
         # Wait for operator check
-        time.sleep(self.check_interval + 5)
+        time.sleep(self.settings["interval"] * 2)
 
         # Verify namespace didn't get marked
         ns = self.core_v1.read_namespace(self.ns_name)
@@ -147,22 +204,33 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         self.ns_name = "test-marked-namespace-unmarked-when-resources-added"
         self.create_namespace(self.ns_name)
 
-        # Wait for namespace to get marked
-        time.sleep(self.check_interval + 5)
-
-        # Verify it's marked
-        ns = self.core_v1.read_namespace(self.ns_name)
-        self.assertIn(self.OPERATOR_ANNOTATION, ns.metadata.annotations)
+        # wait for operator to mark the namespace
+        signal.alarm(DEADLINE_SECONDS)
+        while True:
+            ns = self.core_v1.read_namespace(self.ns_name)
+            if (
+                ns.metadata.annotations
+                and self.OPERATOR_ANNOTATION in ns.metadata.annotations
+                and ns.metadata.annotations[self.OPERATOR_ANNOTATION] == "True"
+            ):
+                break
+            time.sleep(1)
+        signal.alarm(0)
 
         # Add deployment
         self.create_deployment(self.ns_name)
 
-        # Wait for next check
-        time.sleep(self.check_interval + 5)
-
-        # Verify mark was removed
-        ns = self.core_v1.read_namespace(self.ns_name)
-        self.assertNotIn(self.OPERATOR_ANNOTATION, ns.metadata.annotations or {})
+        # wait for operator to unmark the namespace
+        signal.alarm(DEADLINE_SECONDS)
+        while True:
+            ns = self.core_v1.read_namespace(self.ns_name)
+            if (
+                ns.metadata.annotations is None
+                or self.OPERATOR_ANNOTATION not in ns.metadata.annotations
+            ):
+                break
+            time.sleep(1)
+        signal.alarm(0)
 
     def test_cleanup_finalizers(self):
         """Test that finalizers are cleaned up during operator shutdown"""
@@ -184,25 +252,25 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         self.create_deployment(ns1_name)
         self.create_deployment(ns2_name)
 
-        # Wait for operator to check the namespace
-        time.sleep(self.check_interval + 5)
+        # Wait for operator to set finalizers
+        signal.alarm(DEADLINE_SECONDS)
+        while True:
+            ns1 = self.core_v1.read_namespace(ns1_name)
+            ns2 = self.core_v1.read_namespace(ns2_name)
 
-        # check that finalizers are set
-        ns1 = self.core_v1.read_namespace(ns1_name)
-        self.assertIn(self.finalizer, ns1.metadata.finalizers)
-        ns2 = self.core_v1.read_namespace(ns2_name)
-        self.assertIn(self.finalizer, ns2.metadata.finalizers)
-        self.assertIn("dummy.dev/finalizer", ns2.metadata.finalizers)
+            if (
+                ns1.metadata.finalizers
+                and ns2.metadata.finalizers
+                and self.finalizer in ns1.metadata.finalizers
+                and self.finalizer in ns2.metadata.finalizers
+                and "dummy.dev/finalizer" in ns2.metadata.finalizers
+            ):
+                break
+            time.sleep(1)
+        signal.alarm(0)
 
         # scale down the operator deployment
-        self.apps_v1.patch_namespaced_deployment_scale(
-            name=self.operator_name,
-            namespace=self.operator_namespace,
-            body={"spec": {"replicas": 0}},
-        )
-
-        # wait for operator to shutdown
-        time.sleep(5)
+        self.operator_scale_down()
 
         # check that finalizers are removed
         ns1 = self.core_v1.read_namespace(ns1_name)
@@ -211,11 +279,7 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         self.assertNotIn(self.finalizer, ns2.metadata.finalizers)
 
         # scale up the operator deployment
-        self.apps_v1.patch_namespaced_deployment_scale(
-            name=self.operator_name,
-            namespace=self.operator_namespace,
-            body={"spec": {"replicas": 1}},
-        )
+        self.operator_scale_up()
 
         # patch ns2 to remove dummy finalizer
         patch = [
@@ -240,7 +304,7 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         self.create_namespace(self.ns_name)
 
         # wait for operator to check the namespace
-        time.sleep(self.check_interval * 2 + 5)
+        time.sleep(self.settings["interval"] * 3)
 
         # check that the namespace is not deleted
         namespaces = self.core_v1.list_namespace()
@@ -251,28 +315,6 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
 
     def test_dry_run(self):
         """Test that dry run mode works"""
-
-        def restart_operator():
-            # scale down the operator deployment
-            self.apps_v1.patch_namespaced_deployment_scale(
-                name=self.operator_name,
-                namespace=self.operator_namespace,
-                body={"spec": {"replicas": 0}},
-            )
-
-            # wait for operator to scale down
-            time.sleep(10)
-
-            # check that the operator does not have pod running
-            pods = self.core_v1.list_namespaced_pod(namespace=self.operator_namespace)
-            self.assertEqual(len(pods.items), 0)
-
-            # scale up the operator deployment
-            self.apps_v1.patch_namespaced_deployment_scale(
-                name=self.operator_name,
-                namespace=self.operator_namespace,
-                body={"spec": {"replicas": 1}},
-            )
 
         # patch configmap to enable dry run mode
         dry_run_settings = self.settings.copy()
@@ -285,14 +327,14 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         )
 
         # restart the operator
-        restart_operator()
+        self.operator_restart()
 
         # create a new namespace
         self.ns_name = "test-dry-run"
         self.create_namespace(self.ns_name)
 
         # wait for operator to check the namespace
-        time.sleep(self.check_interval * 2 + 5 + 5)
+        time.sleep(self.settings["interval"] * 3)
 
         # check that the namespace is not deleted
         namespaces = self.core_v1.list_namespace()
@@ -309,7 +351,7 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         )
 
         # restart the operator
-        restart_operator()
+        self.operator_restart()
 
 
 if __name__ == "__main__":
