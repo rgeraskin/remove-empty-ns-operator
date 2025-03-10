@@ -19,3 +19,7 @@ run = "helm uninstall -n remove-empty-ns-operator remove-empty-ns-operator"
 [tasks.test]
 description = "Run tests"
 run = "python -m unittest tests/tests.py"
+
+[tasks.push]
+description = "Push docker image to a registry"
+run = "docker buildx --builder all-platform build --platform linux/amd64,linux/arm64 . -t rgeraskin/remove-empty-ns-operator:1.1.1 --push"
