@@ -1,0 +1,14 @@
+[tools]
+helm = "3.16.2"
+poetry = "2.1.1"
+pre-commit = "3.8.0"
+python = "3.12.0"
+tilt = "0.33.21"
+
+[tasks.install]
+description = "Install/upgrade helm chart"
+run = "helm upgrade --install --create-namespace -n remove-empty-ns-operator remove-empty-ns-operator ./helm/"
+
+[tasks.uninstall]
+description = "Uninstall helm chart"
+run = "helm uninstall -n remove-empty-ns-operator remove-empty-ns-operator"

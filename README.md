@@ -46,3 +46,10 @@ protectedNamespaces:
 * `protectedNamespaces` - these namespaces will not be deleated dispite of emptiness
 
 Note that usually there is no need to add kubernetes default namespaces (`default`, `kube-public` and `kube-system`) to `protectedNamespaces` because they have some resources inside in the most cases. But you certainly can do it just to be sure that nothing will happen with them. Also, if your `kube-system` is empty you are probably it trouble already :)
+
+## Development
+
+1. Prepare local dev env with [mise](https://mise.jdx.dev): `mise install`
+1. Install [pre-commit](https://pre-commit.com): `pre-commit install`
+1. Use `mise tasks` for common tasks
+1. Use [tilt](https://tilt.dev) for a development process, e.g. `tilt up`
