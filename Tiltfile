@@ -7,16 +7,18 @@ image = app_name
 docker_build_with_restart(
     image,
     ".",
-    only=["./src"],
+    only=[
+        "./src",
+        "pyproject.toml",
+        "poetry.lock",
+    ],
     live_update=[
         sync(
             "./src/",
-            "/src/",
+            "/app/",
         ),
-        run("cd /src && pip install -r requirements.txt",
-            trigger="src/requirements.txt"),
     ],
-    entrypoint="kopf run -n '*' /src/remove-empty-ns-operator.py"
+    entrypoint="kopf run -n '*' /app/app.py"
 )
 
 helm_resource(
