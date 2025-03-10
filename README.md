@@ -53,3 +53,4 @@ Note that usually there is no need to add kubernetes default namespaces (`defaul
 1. Install [pre-commit](https://pre-commit.com): `pre-commit install`
 1. Use `mise tasks` for common tasks
 1. Use [tilt](https://tilt.dev) for a development process, e.g. `tilt up`
+1. Tests: `mise run test`
