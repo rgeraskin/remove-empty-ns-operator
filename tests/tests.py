@@ -32,6 +32,7 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         cls.finalizer = "kopf.zalando.org/KopfFinalizerMarker"
         cls.operator_name = "remove-empty-ns-operator"
         cls.operator_namespace = "remove-empty-ns-operator"
+        cls.protected_namespace = "protected-one"
 
         # get the operator configmap
         configmap = cls.core_v1.read_namespaced_config_map(
@@ -212,6 +213,26 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         # remove namespaces
         self.core_v1.delete_namespace(ns1_name)
         self.core_v1.delete_namespace(ns2_name)
+
+    def test_protected_namespace(self):
+        """Test that protected namespaces are not deleted"""
+        # ensure that protected namespace is in the list of protected namespaces
+        self.assertIn(self.protected_namespace, self.settings["protectedNamespaces"])
+
+        # create a protected namespace
+        self.ns_name = self.protected_namespace
+        self.create_namespace(self.ns_name)
+
+        # wait for operator to check the namespace
+        time.sleep(self.check_interval * 2 + 5)
+
+        # check that the namespace is not deleted
+        namespaces = self.core_v1.list_namespace()
+        self.assertIn(self.ns_name, [ns.metadata.name for ns in namespaces.items])
+        # check that the namespace does not have the deletionTimestamp
+        ns = self.core_v1.read_namespace(self.ns_name)
+        self.assertIsNone(ns.metadata.deletion_timestamp)
+
 
 if __name__ == "__main__":
     unittest.main()
