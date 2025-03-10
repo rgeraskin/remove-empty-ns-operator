@@ -1,0 +1,24 @@
+apiVersion: v1
+entries:
+  remove-empty-ns-operator:
+  - apiVersion: v2
+    appVersion: 1.1.1
+    created: "2025-03-10T13:10:29.147863+03:00"
+    description: A Helm chart for the remove-empty-ns-operator
+    digest: c7331270ab5c15296b15b27d71568afa1e85e0b871ccdb249914ead203efa8cd
+    home: https://github.com/rgeraskin/remove-empty-ns-operator
+    keywords:
+    - kubernetes
+    - k8s
+    - operator
+    - remove-empty-ns
+    maintainers:
+    - name: Roman Geraskin
+      url: https://github.com/rgeraskin
+    name: remove-empty-ns-operator
+    sources:
+    - https://github.com/rgeraskin/remove-empty-ns-operator
+    urls:
+    - https://rgeraskin.github.io/remove-empty-ns-operator/remove-empty-ns-operator-1.0.0.tgz
+    version: 1.0.0
+generated: "2025-03-10T13:10:29.147322+03:00"
