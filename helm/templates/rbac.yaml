@@ -1,16 +1,16 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: remove-empty-ns-operator
+  name: {{ .Release.Name }}
   labels:
-    application: remove-empty-ns-operator
+    application: {{ .Release.Name }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: remove-empty-ns-operator
+  name: {{ .Release.Name }}
   labels:
-    application: remove-empty-ns-operator
+    application: {{ .Release.Name }}
 rules:
   # Framework: runtime observation of namespaces & CRDs (addition/deletion).
   - apiGroups: [apiextensions.k8s.io]
@@ -26,7 +26,7 @@ rules:
   - apiGroups: [""]
     resources: [events]
     verbs: [create]
-  # remove-empty-ns-operator
+  # {{ .Release.Name }}
   - apiGroups: ["*"]
     resources: ["*"]
     verbs: [list]
@@ -37,14 +37,14 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: remove-empty-ns-operator
+  name: {{ .Release.Name }}
   labels:
-    application: remove-empty-ns-operator
+    application: {{ .Release.Name }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: remove-empty-ns-operator
+  name: {{ .Release.Name }}
 subjects:
   - kind: ServiceAccount
-    name: remove-empty-ns-operator
-    namespace: remove-empty-ns-operator
+    name: {{ .Release.Name }}
+    namespace: {{ .Release.Name }}

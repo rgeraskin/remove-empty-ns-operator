@@ -1,0 +1,27 @@
+# yaml-language-server: $schema=./values.schema.json
+
+image:
+  repository: rgeraskin/remove-empty-ns-operator
+  tag: "1.1"
+
+settings:
+  # interval between namespaces check
+  interval: 18000 # 5h
+  # 'grace period' before new namespace will be checked
+  initialDelay: 300 # 5m
+  # namespace will be treated as empty if it contains only 'ignored resources'
+  ignoredResouces:
+    - apiGroup: ""
+      kind: ConfigMap
+      nameRegExp: kube-root-ca.crt
+    - apiGroup: ""
+      kind: Secret
+      nameRegExp: default-token-\w+$
+    - apiGroup: ""
+      kind: ServiceAccount
+      nameRegExp: default
+  # these namespaces will not be deleated dispite of emptiness
+  protectedNamespaces:
+    - default
+    - kube-public
+    - kube-system

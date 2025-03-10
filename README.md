@@ -8,13 +8,14 @@ Operator iterates over all namespaced api-resources in every namespace. If there
 So operator doesn't delete namespace instantly: first time it marks namespace and after `interval` operator deletes ns if it's still empty.
 ## Installation
 
-```
-kubectl apply -k .
+```shell
+helm repo add rgeraskin https://rgeraskin.github.io/helm-charts/
+helm upgrade --install --create-namespace -n remove-empty-ns-operator rgeraskin/remove-empty-ns-operator
 ```
 
 ## Configuration
 
-See `settings.yaml` as example
+See `settings` in `helm/values.yaml` as example
 
 ```yaml
 interval: "18000"  # 5h

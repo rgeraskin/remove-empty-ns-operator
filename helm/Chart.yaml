@@ -1,0 +1,16 @@
+apiVersion: v2
+appVersion: 1.1.0
+description: A Helm chart for the remove-empty-ns-operator
+home: https://github.com/rgeraskin/remove-empty-ns-operator
+keywords:
+  - kubernetes
+  - k8s
+  - operator
+  - remove-empty-ns
+maintainers:
+  - name: Roman Geraskin
+    url: https://github.com/rgeraskin
+name: remove-empty-ns-operator
+sources:
+  - https://github.com/rgeraskin/remove-empty-ns-operator
+version: 1.0.0

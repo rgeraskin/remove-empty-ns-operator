@@ -1,6 +1,0 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: remove-empty-ns-operator
-  labels:
-    application: remove-empty-ns-operator

@@ -1,0 +1,102 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "global": {
+      "description": "Global values are values that can be accessed from any chart or subchart by exactly the same name.",
+      "required": [],
+      "title": "global",
+      "type": "object"
+    },
+    "image": {
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "default": "rgeraskin/remove-empty-ns-operator",
+          "required": [],
+          "title": "repository",
+          "type": "string"
+        },
+        "tag": {
+          "default": 1.1,
+          "required": [],
+          "title": "tag",
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository",
+        "tag"
+      ],
+      "title": "image",
+      "type": "object"
+    },
+    "settings": {
+      "additionalProperties": false,
+      "properties": {
+        "ignoredResouces": {
+          "description": "namespace will be treated as empty if it contains only 'ignored resources'",
+          "items": {
+            "additionalProperties": false,
+            "properties": {
+              "apiGroup": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "nameRegExp": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "apiGroup",
+              "kind",
+              "nameRegExp"
+            ],
+            "type": "object"
+          },
+          "required": [],
+          "title": "ignoredResouces",
+          "type": "array"
+        },
+        "initialDelay": {
+          "default": 300,
+          "description": "'grace period' before new namespace will be checked",
+          "required": [],
+          "title": "initialDelay",
+          "type": "integer"
+        },
+        "interval": {
+          "default": 18000,
+          "description": "interval between namespaces check",
+          "required": [],
+          "title": "interval",
+          "type": "integer"
+        },
+        "protectedNamespaces": {
+          "description": "these namespaces will not be deleated dispite of emptiness",
+          "items": {
+            "type": "string"
+          },
+          "required": [],
+          "title": "protectedNamespaces",
+          "type": "array"
+        }
+      },
+      "required": [
+        "interval",
+        "initialDelay",
+        "ignoredResouces",
+        "protectedNamespaces"
+      ],
+      "title": "settings",
+      "type": "object"
+    }
+  },
+  "required": [
+    "image",
+    "settings"
+  ],
+  "type": "object"
+}
