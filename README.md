@@ -9,8 +9,8 @@ So operator doesn't delete namespace instantly: first time it marks namespace an
 ## Installation
 
 ```shell
-helm repo add rgeraskin https://rgeraskin.github.io/helm-charts/
-helm upgrade --install --create-namespace -n remove-empty-ns-operator rgeraskin/remove-empty-ns-operator
+helm repo add remove-empty-ns-operator https://rgeraskin.github.io/remove-empty-ns-operator/
+helm upgrade --install --create-namespace -n remove-empty-ns-operator remove-empty-ns-operator/remove-empty-ns-operator
 ```
 
 ## Configuration
