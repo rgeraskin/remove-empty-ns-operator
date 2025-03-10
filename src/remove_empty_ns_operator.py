@@ -1,4 +1,6 @@
-# #!/usr/bin/env python3
+#!/usr/bin/env python3
+
+"""Kubernetes operator that automatically removes empty namespaces."""
 
 import re
 
@@ -7,31 +9,35 @@ import yaml
 from kubernetes import client, config, dynamic
 from kubernetes.dynamic.resource import ResourceList
 
+ANNOTATION = "remove-empty-ns-operator.kopf.dev/will-remove"
+
 # config.load_kube_config()
 config.load_incluster_config()
 core_api = client.CoreV1Api()
 dynamic_client = dynamic.DynamicClient(client.api_client.ApiClient())
-annotation = "remove-empty-ns-operator.kopf.dev/will-remove"
 
-with open("/config/settings.yaml") as f:
+with open("/config/settings.yaml", encoding="utf-8") as f:
     settings = yaml.safe_load(f)
-interval = int(settings["interval"])
 
-initial_delay = int(settings["initialDelay"])
+interval = settings["interval"]
+initial_delay = settings["initialDelay"]
 ignored_resouces = settings["ignoredResouces"]
 protected_namespaces = settings.get("protectedNamespaces", [])
 
 
-@kopf.timer('namespaces',
-            interval=interval,
-            initial_delay=initial_delay,
-            when=lambda name, **_: name not in protected_namespaces)
+@kopf.timer(
+    "namespaces",
+    interval=interval,
+    initial_delay=initial_delay,
+    when=lambda name, **_: name not in protected_namespaces,
+)
+# pylint: disable=unused-argument
 def remove_empty_ns(status, name, body, logger, **kwargs):
-    global core_api
+    """Check if namespace is empty and mark it for deletion if needed."""
     meta = body["metadata"]
 
     try:
-        should_remove = meta["annotations"][annotation] == "True"
+        should_remove = meta["annotations"][ANNOTATION] == "True"
     except KeyError:
         should_remove = False
 
@@ -40,29 +46,34 @@ def remove_empty_ns(status, name, body, logger, **kwargs):
             logger.info(f"namespace {name} has deletion mark, deleting")
             core_api.delete_namespace(name=name)
         else:
-            logger.info(f"namespace {name} is empty, "
-                        f"adding deletion mark to delete it next time")
+            logger.info(
+                f"namespace {name} is empty, "
+                f"adding deletion mark to delete it next time"
+            )
             add_will_remove_annotation(name, meta)
     elif should_remove:
-        logger.info(
-            f"namespace {name} is not empty anymore, removing deletion mark")
+        logger.info(f"namespace {name} is not empty anymore, removing deletion mark")
         del_will_remove_annotation(name, meta)
 
 
 def add_will_remove_annotation(name, meta):
+    """Add annotation to mark namespace for deletion."""
     patch_will_remove_annotation(name, meta, "True")
 
 
 def del_will_remove_annotation(name, meta):
+    """Remove deletion annotation from namespace."""
     patch_will_remove_annotation(name, meta, None)
 
 
 def patch_will_remove_annotation(name, meta, value):
-    global annotation, core_api
-
-    meta.setdefault("annotations", {}).update({annotation: value})
-    for unexpected_argument in ('resourceVersion', 'creationTimestamp',
-                                'managedFields'):
+    """Update namespace with deletion annotation value."""
+    meta.setdefault("annotations", {}).update({ANNOTATION: value})
+    for unexpected_argument in (
+        "resourceVersion",
+        "creationTimestamp",
+        "managedFields",
+    ):
         try:
             del meta[unexpected_argument]
         except KeyError:
@@ -72,31 +83,36 @@ def patch_will_remove_annotation(name, meta, value):
 
 
 def is_empty(namespace, logger):
-    global ignored_resouces, dynamic_client
-
+    """Check if namespace not contains any non-ignored resources."""
     for api_resource in dynamic_client.resources:
-        if (not isinstance(api_resource[0], ResourceList)
-                and "get" in api_resource[0].verbs
-                and api_resource[0].namespaced
-                and api_resource[0].kind != "Event"):
+        if (
+            not isinstance(api_resource[0], ResourceList)
+            and "get" in api_resource[0].verbs
+            and api_resource[0].namespaced
+            and api_resource[0].kind != "Event"
+        ):
             api_resource = api_resource[0]
 
             resource_instance = api_resource.get(namespace=namespace)
 
             items = resource_instance.items
             for item in items:
-                logger.debug(f"{namespace=}: found {api_resource.group=} "
-                             f"{api_resource.kind=} name={item.metadata.name}")
+                logger.debug(
+                    f"{namespace=}: found {api_resource.group=} "
+                    f"{api_resource.kind=} name={item.metadata.name}"
+                )
                 ignored = False
                 for ignored_resource in ignored_resouces:
-                    if (api_resource.group == ignored_resource["apiGroup"]
-                            and api_resource.kind == ignored_resource["kind"]
-                            and re.match(ignored_resource["nameRegExp"],
-                                         item.metadata.name)):
+                    if (
+                        api_resource.group == ignored_resource["apiGroup"]
+                        and api_resource.kind == ignored_resource["kind"]
+                        and re.match(ignored_resource["nameRegExp"], item.metadata.name)
+                    ):
                         ignored = True
                         logger.debug(
                             f"{namespace=}: name={item.metadata.name} "
-                            f"should be ignored")
+                            f"should be ignored"
+                        )
                         break
                 if not ignored:
                     logger.debug(f"{namespace=} is not empty")

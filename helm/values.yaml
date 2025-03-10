@@ -2,7 +2,7 @@
 
 image:
   repository: rgeraskin/remove-empty-ns-operator
-  tag: "1.1"
+  tag: 1.1.1
 
 settings:
   # interval between namespaces check
