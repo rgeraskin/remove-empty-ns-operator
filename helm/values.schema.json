@@ -89,6 +89,13 @@
           "required": [],
           "title": "cleanupFinalizers",
           "type": "boolean"
+        },
+        "dryRun": {
+          "default": false,
+          "description": "dry run mode: don't delete namespaces, just log what would be deleted",
+          "required": [],
+          "title": "dryRun",
+          "type": "boolean"
         }
       },
       "required": [
@@ -96,7 +103,8 @@
         "initialDelay",
         "ignoredResouces",
         "protectedNamespaces",
-        "cleanupFinalizers"
+        "cleanupFinalizers",
+        "dryRun"
       ],
       "title": "settings",
       "type": "object"

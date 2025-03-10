@@ -70,8 +70,14 @@ def remove_empty_ns(status, name, body, logger, **_):
 
     if is_empty(name, logger):
         if should_remove:
-            logger.info(f"namespace {name} has deletion mark, deleting")
-            core_api.delete_namespace(name=name)
+            if settings["dryRun"]:
+                logger.info(
+                    f"namespace {name} has deletion mark, "
+                    f"would be deleted but dry-run is enabled"
+                )
+            else:
+                logger.info(f"namespace {name} has deletion mark, deleting")
+                core_api.delete_namespace(name=name)
         else:
             logger.info(
                 f"namespace {name} is empty, "

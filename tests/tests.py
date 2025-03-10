@@ -41,6 +41,22 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         # decode configmap.data["settings.yaml"]) from yaml to dict
         cls.settings = yaml.safe_load(configmap.data["settings.yaml"])
 
+    @classmethod
+    def tearDownClass(cls):
+        # restore the original settings
+        cls.core_v1.patch_namespaced_config_map(
+            name=cls.operator_name,
+            namespace=cls.operator_namespace,
+            body={"data": {"settings.yaml": yaml.dump(cls.settings)}},
+        )
+
+        # scale up the operator deployment
+        cls.apps_v1.patch_namespaced_deployment_scale(
+            name=cls.operator_name,
+            namespace=cls.operator_namespace,
+            body={"spec": {"replicas": 1}},
+        )
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ns_name = None
@@ -232,6 +248,68 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         # check that the namespace does not have the deletionTimestamp
         ns = self.core_v1.read_namespace(self.ns_name)
         self.assertIsNone(ns.metadata.deletion_timestamp)
+
+    def test_dry_run(self):
+        """Test that dry run mode works"""
+
+        def restart_operator():
+            # scale down the operator deployment
+            self.apps_v1.patch_namespaced_deployment_scale(
+                name=self.operator_name,
+                namespace=self.operator_namespace,
+                body={"spec": {"replicas": 0}},
+            )
+
+            # wait for operator to scale down
+            time.sleep(10)
+
+            # check that the operator does not have pod running
+            pods = self.core_v1.list_namespaced_pod(namespace=self.operator_namespace)
+            self.assertEqual(len(pods.items), 0)
+
+            # scale up the operator deployment
+            self.apps_v1.patch_namespaced_deployment_scale(
+                name=self.operator_name,
+                namespace=self.operator_namespace,
+                body={"spec": {"replicas": 1}},
+            )
+
+        # patch configmap to enable dry run mode
+        dry_run_settings = self.settings.copy()
+        dry_run_settings["dryRun"] = True
+
+        self.core_v1.patch_namespaced_config_map(
+            name=self.operator_name,
+            namespace=self.operator_namespace,
+            body={"data": {"settings.yaml": yaml.dump(dry_run_settings)}},
+        )
+
+        # restart the operator
+        restart_operator()
+
+        # create a new namespace
+        self.ns_name = "test-dry-run"
+        self.create_namespace(self.ns_name)
+
+        # wait for operator to check the namespace
+        time.sleep(self.check_interval * 2 + 5 + 5)
+
+        # check that the namespace is not deleted
+        namespaces = self.core_v1.list_namespace()
+        self.assertIn(self.ns_name, [ns.metadata.name for ns in namespaces.items])
+        # check that the namespace does not have the deletionTimestamp
+        ns = self.core_v1.read_namespace(self.ns_name)
+        self.assertIsNone(ns.metadata.deletion_timestamp)
+
+        # restore the original settings
+        self.core_v1.patch_namespaced_config_map(
+            name=self.operator_name,
+            namespace=self.operator_namespace,
+            body={"data": {"settings.yaml": yaml.dump(self.settings)}},
+        )
+
+        # restart the operator
+        restart_operator()
 
 
 if __name__ == "__main__":

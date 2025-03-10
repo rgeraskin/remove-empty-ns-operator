@@ -2,7 +2,7 @@
 
 image:
   repository: rgeraskin/remove-empty-ns-operator
-  tag: 1.1.1
+  tag: 1.2.0
 
 settings:
   # interval between namespaces check
@@ -27,6 +27,8 @@ settings:
     - kube-system
   # cleanup kopf finalizers from all namespaces during operator shutdown
   cleanupFinalizers: true
+  # dry run mode: don't delete namespaces, just log what would be deleted
+  dryRun: false
 
 # If the finalizers cleanup takes longer than that in total (e.g. due to retries),
 # the activity will not be finished in full, as the pod will be SIGKILL’ed by Kubernetes.
