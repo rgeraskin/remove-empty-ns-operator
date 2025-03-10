@@ -10,6 +10,7 @@ from kubernetes import client, config, dynamic
 from kubernetes.dynamic.resource import ResourceList
 
 ANNOTATION = "remove-empty-ns-operator.kopf.dev/will-remove"
+FINALIZER = "kopf.zalando.org/KopfFinalizerMarker"
 
 # config.load_kube_config()
 config.load_incluster_config()
@@ -25,6 +26,32 @@ ignored_resouces = settings["ignoredResouces"]
 protected_namespaces = settings.get("protectedNamespaces", [])
 
 
+@kopf.on.cleanup()
+async def cleanup(logger, **_):
+    """Remove finalizers from all namespaces during operator shutdown."""
+    logger.info("Shutting down")
+    if not settings["cleanupFinalizers"]:
+        logger.info("cleanupFinalizers is disabled, skipping")
+        return
+
+    # for every namespace, remove the finalizer
+    for namespace in core_api.list_namespace().items:
+        if namespace.metadata.finalizers and FINALIZER in namespace.metadata.finalizers:
+            # remove the finalizer from list
+            logger.info(f"Removing finalizer from namespace={namespace.metadata.name}")
+            namespace.metadata.finalizers.remove(FINALIZER)
+            # https://github.com/kubernetes-client/python/issues/2307#issuecomment-2483720199
+            patch = [
+                {
+                    "op": "replace",
+                    "path": "/metadata/finalizers",
+                    "value": namespace.metadata.finalizers,
+                }
+            ]
+            core_api.patch_namespace(namespace.metadata.name, patch)
+    logger.info("Cleanup finalizers completed")
+
+
 @kopf.timer(
     "namespaces",
     interval=interval,
@@ -32,7 +59,7 @@ protected_namespaces = settings.get("protectedNamespaces", [])
     when=lambda name, **_: name not in protected_namespaces,
 )
 # pylint: disable=unused-argument
-def remove_empty_ns(status, name, body, logger, **kwargs):
+def remove_empty_ns(status, name, body, logger, **_):
     """Check if namespace is empty and mark it for deletion if needed."""
     meta = body["metadata"]
 

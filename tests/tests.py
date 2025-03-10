@@ -1,8 +1,11 @@
 """Tests for the remove-empty-ns-operator that manages empty Kubernetes namespaces."""
 
+# 2do: replace time.sleep with something more elegant
+
 import time
 import unittest
 
+import yaml
 from kubernetes import client, config
 from kubernetes.client.rest import ApiException
 from kubernetes.config.config_exception import ConfigException
@@ -26,6 +29,16 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         cls.TEST_NS_PREFIX = "test-empty-ns-"
         cls.OPERATOR_ANNOTATION = "remove-empty-ns-operator.kopf.dev/will-remove"
         cls.check_interval = 5
+        cls.finalizer = "kopf.zalando.org/KopfFinalizerMarker"
+        cls.operator_name = "remove-empty-ns-operator"
+        cls.operator_namespace = "remove-empty-ns-operator"
+
+        # get the operator configmap
+        configmap = cls.core_v1.read_namespaced_config_map(
+            name=cls.operator_name, namespace=cls.operator_namespace
+        )
+        # decode configmap.data["settings.yaml"]) from yaml to dict
+        cls.settings = yaml.safe_load(configmap.data["settings.yaml"])
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -33,11 +46,12 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
 
     def tearDown(self):
         """Clean up the test namespace if it still exists"""
-        try:
-            self.core_v1.delete_namespace(self.ns_name)
-        except ApiException as e:
-            if e.status != 404:  # Ignore if already deleted
-                raise
+        if self.ns_name:
+            try:
+                self.core_v1.delete_namespace(self.ns_name)
+            except ApiException as e:
+                if e.status != 404:  # Ignore if already deleted
+                    raise
 
     def create_namespace(self, name):
         """Helper to create a namespace"""
@@ -133,6 +147,71 @@ class TestRemoveEmptyNsOperator(unittest.TestCase):
         ns = self.core_v1.read_namespace(self.ns_name)
         self.assertNotIn(self.OPERATOR_ANNOTATION, ns.metadata.annotations or {})
 
+    def test_cleanup_finalizers(self):
+        """Test that finalizers are cleaned up during operator shutdown"""
+        # Ensure that cleanupFinalizers is enabled
+        self.assertEqual(self.settings["cleanupFinalizers"], True)
+
+        # Create a new namespace without finalizers
+        ns1_name = "test-cleanup-finalizers"
+        self.create_namespace(ns1_name)
+
+        # Create a new namespace with additional finalizer
+        ns2_name = "test-cleanup-finalizers-with-additional-finalizer"
+        self.create_namespace(ns2_name)
+        self.core_v1.patch_namespace(
+            ns2_name, {"metadata": {"finalizers": ["dummy.dev/finalizer"]}}
+        )
+
+        # Create a deployment to make namespaces non-empty
+        self.create_deployment(ns1_name)
+        self.create_deployment(ns2_name)
+
+        # Wait for operator to check the namespace
+        time.sleep(self.check_interval + 5)
+
+        # check that finalizers are set
+        ns1 = self.core_v1.read_namespace(ns1_name)
+        self.assertIn(self.finalizer, ns1.metadata.finalizers)
+        ns2 = self.core_v1.read_namespace(ns2_name)
+        self.assertIn(self.finalizer, ns2.metadata.finalizers)
+        self.assertIn("dummy.dev/finalizer", ns2.metadata.finalizers)
+
+        # scale down the operator deployment
+        self.apps_v1.patch_namespaced_deployment_scale(
+            name=self.operator_name,
+            namespace=self.operator_namespace,
+            body={"spec": {"replicas": 0}},
+        )
+
+        # wait for operator to shutdown
+        time.sleep(5)
+
+        # check that finalizers are removed
+        ns1 = self.core_v1.read_namespace(ns1_name)
+        self.assertIsNone(ns1.metadata.finalizers)
+        ns2 = self.core_v1.read_namespace(ns2_name)
+        self.assertNotIn(self.finalizer, ns2.metadata.finalizers)
+
+        # scale up the operator deployment
+        self.apps_v1.patch_namespaced_deployment_scale(
+            name=self.operator_name,
+            namespace=self.operator_namespace,
+            body={"spec": {"replicas": 1}},
+        )
+
+        # patch ns2 to remove dummy finalizer
+        patch = [
+            {
+                "op": "remove",
+                "path": "/metadata/finalizers",
+            }
+        ]
+        self.core_v1.patch_namespace(ns2_name, patch)
+
+        # remove namespaces
+        self.core_v1.delete_namespace(ns1_name)
+        self.core_v1.delete_namespace(ns2_name)
 
 if __name__ == "__main__":
     unittest.main()

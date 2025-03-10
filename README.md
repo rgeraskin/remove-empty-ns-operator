@@ -1,4 +1,5 @@
 # Remove Empty Namespaces Operator
+
 A Kubernetes operator that deletes namespaces without resources.
 
 ## Description
@@ -6,6 +7,7 @@ A Kubernetes operator that deletes namespaces without resources.
 Operator iterates over all namespaced api-resources in every namespace. If there are no resources, it annotates namespace as a candidate for deletion. The namespace will be deleted after specified time interval if there will be no resources still.
 
 So operator doesn't delete namespace instantly: first time it marks namespace and after `interval` operator deletes ns if it's still empty.
+
 ## Installation
 
 ```shell
@@ -34,10 +36,10 @@ ignoredResouces:
     kind: ServiceAccount
     nameRegExp: default
 protectedNamespaces:
-  - protected-one
   - default
   - kube-public
   - kube-system
+cleanupFinalizers: true
 ```
 
 * `interval` - interval between namespaces check
@@ -45,7 +47,13 @@ protectedNamespaces:
 * `ignoredResouces` - namespace will be treated as empty if it contains only 'ignored resources'
 * `protectedNamespaces` - these namespaces will not be deleated dispite of emptiness
 
-Note that usually there is no need to add kubernetes default namespaces (`default`, `kube-public` and `kube-system`) to `protectedNamespaces` because they have some resources inside in the most cases. But you certainly can do it just to be sure that nothing will happen with them. Also, if your `kube-system` is empty you are probably it trouble already :)
+  Usually there is no need to add kubernetes default namespaces (`default`, `kube-public`, and `kube-system`) to `protectedNamespaces` because they have some resources inside in the most cases.
+
+* `cleanupFinalizers` - cleanup kopf finalizers from all namespaces during operator shutdown ([motivation](https://github.com/rgeraskin/remove-empty-ns-operator/issues/5#issuecomment-2710027536))
+
+  If the finalizers cleanup takes longer than that in total (e.g. due to retries), the activity will not be finished in full, as the pod will be SIGKILL’ed by Kubernetes.
+
+  So adjust the value of `terminationGracePeriodSeconds` if you have a lot of namespaces to cleanup.
 
 ## Development
 

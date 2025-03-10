@@ -82,21 +82,40 @@
           "required": [],
           "title": "protectedNamespaces",
           "type": "array"
+        },
+        "cleanupFinalizers": {
+          "default": true,
+          "description": "cleanup kopf finalizers from all namespaces during operator shutdown",
+          "required": [],
+          "title": "cleanupFinalizers",
+          "type": "boolean"
         }
       },
       "required": [
         "interval",
         "initialDelay",
         "ignoredResouces",
-        "protectedNamespaces"
+        "protectedNamespaces",
+        "cleanupFinalizers"
       ],
       "title": "settings",
       "type": "object"
+    },
+    "terminationGracePeriodSeconds": {
+      "default": null,
+      "description": "If the finalizers cleanup takes longer than that in total (e.g. due to retries), the activity will not be finished in full, as the pod will be SIGKILL’ed by Kubernetes. Adjust this value if you have a lot of namespaces to cleanup.",
+      "required": [],
+      "title": "terminationGracePeriodSeconds",
+      "type": [
+        "integer",
+        "null"
+      ]
     }
   },
   "required": [
     "image",
-    "settings"
+    "settings",
+    "terminationGracePeriodSeconds"
   ],
   "type": "object"
 }
