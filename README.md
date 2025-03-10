@@ -40,6 +40,7 @@ protectedNamespaces:
   - kube-public
   - kube-system
 cleanupFinalizers: true
+dryRun: false
 ```
 
 * `interval` - interval between namespaces check
@@ -54,6 +55,8 @@ cleanupFinalizers: true
   If the finalizers cleanup takes longer than that in total (e.g. due to retries), the activity will not be finished in full, as the pod will be SIGKILL’ed by Kubernetes.
 
   So adjust the value of `terminationGracePeriodSeconds` if you have a lot of namespaces to cleanup.
+
+* `dryRun` - dry run mode: don't delete namespaces, just log what would be deleted
 
 ## Development
 
