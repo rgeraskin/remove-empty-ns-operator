@@ -2,6 +2,31 @@
 
 A Kubernetes operator that deletes namespaces without resources.
 
+> [!WARNING]
+> **This operator is no longer being developed.** Please use
+> [remove-empty-ns](https://github.com/rgeraskin/remove-empty-ns) instead — a
+> dedicated app designed to run as a `CronJob` (or ad-hoc from a shell / CI).
+>
+> The initial intention here was to try out operator development in Python
+> (using [kopf](https://github.com/nolar/kopf)). In practice, the original use
+> case — removing empty namespaces — is a periodic cleanup task that fits an
+> app + `CronJob` better than a continuously reconciling operator: no
+> long-running controller to keep healthy, no finalizers to clean up, and it's
+> trivial to run once locally or in CI against any cluster.
+>
+> `remove-empty-ns` is a redesign rather than a drop-in replacement — the config
+> model is different:
+>
+> | This operator (kopf, Helm, long-running) | `remove-empty-ns` (script, Kustomize, CronJob/CLI) |
+> | --- | --- |
+> | `interval` + `initialDelay` (reconcile timing) | CronJob schedule + `ageGreaterThan` (min namespace age) |
+> | `protectedNamespaces` (exact names) | `namespacesIgnored` / `namespacesConsidered` (regex allow/deny) |
+> | `ignoredResouces` (object-level ignore) | `resourcesIgnored` / `resourcesConsidered` (object-level allow/deny) |
+> | — | `apiResourcesIgnored` / `apiResourcesConsidered` (API-kind allow/deny) |
+> | mark-then-delete always on (annotation) | `doubleCheck` opt-in (label; delete only if still empty next run) |
+> | `cleanupFinalizers` (removes kopf finalizers on shutdown) | not needed — no operator, no finalizers |
+> | `dryRun` | `dryRun` |
+
 ## Description
 
 Operator iterates over all namespaced api-resources in every namespace. If there are no resources, it annotates namespace as a candidate for deletion. The namespace will be deleted after specified time interval if there will be no resources still.
